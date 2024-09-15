@@ -1,6 +1,6 @@
 # Open Translate
 
-![open translate demo](assets/open-translate-demo.gif)
+![open translate demo](https://github.com/FatihErtugral/public-assests/raw/main/open-translate/open-translate-demo-.gif)
 
 ## Description:
 
