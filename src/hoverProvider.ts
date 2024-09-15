@@ -11,7 +11,7 @@ export default class TranslateHoverProvider implements vscode.HoverProvider {
         this.beforeTranslatedText = '';
     }
 
-    provideHover (
+    public provideHover (
         document: vscode.TextDocument,
         position: vscode.Position,
     ): vscode.ProviderResult<vscode.Hover> {
@@ -41,7 +41,7 @@ export default class TranslateHoverProvider implements vscode.HoverProvider {
             .catch((error) => new vscode.Hover(`**Translate Error:**\n${error instanceof Error ? error.message : 'Unknown error'}`));
     }
 
-    isSelectionMatch (position: vscode.Position): boolean {
+    private isSelectionMatch (position: vscode.Position): boolean {
         const editor = vscode.window.activeTextEditor;
 
         if (!editor) {
@@ -58,11 +58,11 @@ export default class TranslateHoverProvider implements vscode.HoverProvider {
         return true;
     }
 
-    isValidCharLimit (text: string): boolean {
+    private isValidCharLimit (text: string): boolean {
         return Boolean(text.length) && text.length < TranslateHoverProvider.CHAR_LIMIT;
     }
 
-    get targetLang () {
+    private get targetLang () {
         return vscode.workspace.getConfiguration('extension').get<string>('targetLanguage') || 'tr';
     }
 }
