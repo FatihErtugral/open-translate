@@ -3,7 +3,7 @@
     "publisher": "fatihertugral",
     "displayName": "Open Translate",
     "description": "This open-source VSCode extension utilizes the Lingva Translate project to offer translation functionality directly within the editor. The extension allows you to translate selected text and view the translation in a hover popup.",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "repository": {
         "type": "git",
         "url": "https://github.com/FatihErtugral/open-translate"
