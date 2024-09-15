@@ -1,11 +1,19 @@
+# Open Translate
+
 Description:
 
-This open-source VSCode extension utilizes the Lingva Translate project to offer translation functionality directly within the editor. The extension allows you to translate selected text and view the translation in a hover popup.
+This open-source VSCode extension utilizes the [Lingva Translate](https://github.com/thedaviddelta/lingva-translate) to offer translation functionality directly within the editor. The extension allows you to translate selected text and view the translation in a hover popup.
 
-License:
+## Features
 
-This project is licensed under the Apache License 2.0.
+- Translate text on hover.
+- Support for multiple languages.
+- Open source and free.
 
-Repository:
+## License
 
-The source code is available on GitHub.
+This extension is licensed under the [Apache License](./LICENSE).
+
+## Credits
+
+This extension uses the [Lingva Translate](https://github.com/thedaviddelta/lingva-translate) project, which is an open-source translation tool.
