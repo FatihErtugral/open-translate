@@ -164,6 +164,16 @@
                         "yo",
                         "zu"
                     ]
+                },
+                "open-translate.apiUrl": {
+                    "type": "string",
+                    "default": "https://lingva.ml/api/graphql",
+                    "description": "The API URL for the translation service.",
+                    "enum": [
+                        "https://lingva.ml/api/graphql",
+                        "https://lingva.lunar.icu/api/graphql",
+                        "https://translate.plausibility.cloud/api/graphql"
+                    ]
                 }
             }
         },

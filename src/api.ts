@@ -1,6 +1,9 @@
+import { workspace } from 'vscode';
 import { TranslationResponse } from './types.js';
+import Enums from './enum.js';
 
-export const apiUrl = 'https://lingva.lunar.icu/api/graphql';
+const apiUrl = workspace.getConfiguration(Enums.COMMAND_ID).get('apiUrl', 'https://lingva.ml/api/graphql');
+
 export const headers = {
     'Content-Type': 'application/json',
 };
