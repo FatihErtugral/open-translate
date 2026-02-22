@@ -3,7 +3,7 @@
     "publisher": "fatihertugral",
     "displayName": "Open Translate",
     "description": "This open-source VSCode extension utilizes the Lingva Translate project to offer translation functionality directly within the editor. The extension allows you to translate selected text and view the translation in a hover popup.",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "repository": {
         "type": "git",
         "url": "https://github.com/FatihErtugral/open-translate"
@@ -163,6 +163,16 @@
                         "yi",
                         "yo",
                         "zu"
+                    ]
+                },
+                "open-translate.apiUrl": {
+                    "type": "string",
+                    "default": "https://lingva.ml/api/graphql",
+                    "description": "The API URL for the translation service.",
+                    "enum": [
+                        "https://lingva.ml/api/graphql",
+                        "https://lingva.lunar.icu/api/graphql",
+                        "https://translate.plausibility.cloud/api/graphql"
                     ]
                 }
             }
