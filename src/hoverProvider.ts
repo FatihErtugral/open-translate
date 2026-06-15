@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { translateText } from './api.js';
+import Enums from './enum.js';
 
 export default class TranslateHoverProvider implements vscode.HoverProvider {
     private static CHAR_LIMIT = 2000;
@@ -63,6 +64,6 @@ export default class TranslateHoverProvider implements vscode.HoverProvider {
     }
 
     private get targetLang () {
-        return vscode.workspace.getConfiguration('extension').get<string>('targetLanguage') || 'tr';
+        return vscode.workspace.getConfiguration(Enums.COMMAND_ID).get<string>('targetLanguage') || 'tr';
     }
 }

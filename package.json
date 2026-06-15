@@ -2,7 +2,7 @@
     "name": "open-translate",
     "publisher": "fatihertugral",
     "displayName": "Open Translate",
-    "description": "This open-source VSCode extension utilizes the Lingva Translate project to offer translation functionality directly within the editor. The extension allows you to translate selected text and view the translation in a hover popup.",
+    "description": "This open-source VSCode extension offers translation functionality directly within the editor using Google Translate's free endpoint. The extension allows you to translate selected text and view the translation in a hover popup.",
     "version": "0.0.4",
     "repository": {
         "type": "git",
@@ -167,20 +167,33 @@
                 },
                 "open-translate.apiUrl": {
                     "type": "string",
-                    "default": "https://lingva.ml/api/graphql",
-                    "description": "The API URL for the translation service.",
-                    "enum": [
-                        "https://lingva.ml/api/graphql",
-                        "https://lingva.lunar.icu/api/graphql",
-                        "https://translate.plausibility.cloud/api/graphql"
-                    ]
+                    "default": "https://translate.googleapis.com/translate_a/single",
+                    "markdownDescription": "Preferred Google Translate `translate_a/single` endpoint, tried first. No API key required. Enter any URL with the same response format (including your own proxy). When this endpoint fails, `#open-translate.fallbackApiUrls#` are tried in order and the first working one is saved here automatically.\n\nKnown public endpoints:\n- `https://translate.googleapis.com/translate_a/single`\n- `https://clients5.google.com/translate_a/single`\n- `https://translate.google.com/translate_a/single`"
+                },
+                "open-translate.fallbackApiUrls": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [
+                        "https://translate.googleapis.com/translate_a/single",
+                        "https://clients5.google.com/translate_a/single",
+                        "https://translate.google.com/translate_a/single"
+                    ],
+                    "description": "Endpoints tried in order when the preferred API URL fails. The first one that returns a valid translation becomes the new default. Each must speak the Google translate_a/single response format."
                 }
             }
         },
         "commands": [
             {
                 "command": "open-translate.setTargetLanguage",
-                "title": "Set Target Language"
+                "title": "Set Target Language",
+                "category": "Open Translate"
+            },
+            {
+                "command": "open-translate.setApiUrl",
+                "title": "Set API URL",
+                "category": "Open Translate"
             }
         ]
     },
@@ -215,6 +228,6 @@
         "localization",
         "multi translate",
         "multi translation",
-        "Lingva Translate"
+        "Google Translate"
     ]
 }

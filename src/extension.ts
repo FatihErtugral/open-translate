@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { getSetTargetLanguageCommandHandler } from './commands';
+import { getSetApiUrlCommandHandler, getSetTargetLanguageCommandHandler } from './commands';
 import TranslateHoverProvider from './hoverProvider';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -9,8 +9,9 @@ export function activate(context: vscode.ExtensionContext) {
         hoverProvider
     );
     const setTargetLanguageCommandHandler = getSetTargetLanguageCommandHandler();
+    const setApiUrlCommandHandler = getSetApiUrlCommandHandler();
 
-    context.subscriptions.push(hoverProviderRegistration, setTargetLanguageCommandHandler);
+    context.subscriptions.push(hoverProviderRegistration, setTargetLanguageCommandHandler, setApiUrlCommandHandler);
 }
 
 export function deactivate() {}

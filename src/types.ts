@@ -1,47 +1,9 @@
-export interface Language {
-    code: string;
-    name: string;
-}
+/**
+ * Shape of the response returned by Google's free `translate_a/single`
+ * endpoint. The first element is an array of translated segments, where each
+ * segment is `[translatedText, sourceText, ...]`. The remaining top-level
+ * elements (detected language, confidence, etc.) are not consumed.
+ */
+export type GoogleTranslateSegment = [string, string, ...unknown[]];
 
-export interface TranslationSource {
-    lang: Language;
-    text: string;
-    audio: number[];
-    detected?: Language;
-    typo?: string;
-    pronunciation?: string;
-    definitions?: {
-        type: string;
-        list: {
-            definition: string;
-            example: string;
-            field: string;
-            synonyms: string[];
-        }[];
-    };
-    examples?: string[];
-    similar?: string[];
-}
-
-export interface TranslationTarget {
-    lang: Language;
-    text: string;
-    audio: number[];
-    pronunciation?: string;
-    extraTranslations?: {
-        type: string;
-        list: {
-            word: string;
-            article: string;
-            frequency: number;
-            meanings: string[];
-        }[];
-    };
-}
-
-export interface TranslationResponse {
-    translation: {
-        source: TranslationSource;
-        target: TranslationTarget;
-    };
-}
+export type GoogleTranslateResponse = [GoogleTranslateSegment[], ...unknown[]];

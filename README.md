@@ -4,13 +4,24 @@
 
 ## Description:
 
-This open-source VSCode extension utilizes the [Lingva Translate](https://github.com/thedaviddelta/lingva-translate) to offer translation functionality directly within the editor. The extension allows you to translate selected text and view the translation in a hover popup.
+This open-source VSCode extension offers translation functionality directly within the editor using Google Translate's free, key-less endpoint. The extension allows you to translate selected text and view the translation in a hover popup.
 
 ## Features
 
 - Translate text on hover.
 - Support for multiple languages.
+- No API key required.
+- Automatic endpoint failover — if one endpoint is unreachable, the next is tried and the working one becomes the default.
+- Custom endpoint support — set your own translation URL via the **Open Translate: Set API URL** command or the `open-translate.apiUrl` setting.
 - Open source and free.
+
+## Settings
+
+| Setting | Description |
+| --- | --- |
+| `open-translate.targetLanguage` | Target language for translations (default `tr`). |
+| `open-translate.apiUrl` | Preferred Google `translate_a/single` endpoint. Auto-updated to whichever endpoint is working. |
+| `open-translate.fallbackApiUrls` | Endpoints tried in order when the preferred one fails. |
 
 ## License
 
@@ -18,4 +29,4 @@ This extension is licensed under the [Apache License](./LICENSE).
 
 ## Credits
 
-This extension uses the [Lingva Translate](https://github.com/thedaviddelta/lingva-translate) project, which is an open-source translation tool.
+Translations are powered by Google Translate's public `translate_a/single` endpoint.
