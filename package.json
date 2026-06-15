@@ -3,7 +3,7 @@
     "publisher": "fatihertugral",
     "displayName": "Open Translate",
     "description": "This open-source VSCode extension offers translation functionality directly within the editor using Google Translate's free endpoint. The extension allows you to translate selected text and view the translation in a hover popup.",
-    "version": "0.0.4",
+    "version": "0.1.0",
     "repository": {
         "type": "git",
         "url": "https://github.com/FatihErtugral/open-translate"
