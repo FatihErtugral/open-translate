@@ -1,9 +1,12 @@
 import * as vscode from 'vscode';
 import * as assert from 'assert';
 import * as path from 'path';
+import * as http2 from 'http2';
+import { AddressInfo } from 'net';
 import * as sinon from 'sinon';
 import TranslateHoverProvider from '../hoverProvider';
 import * as api from '../api';
+import * as httpClient from '../httpClient';
 
 suite('TranslateHoverProvider Test Suite', () => {
     let hoverProvider: TranslateHoverProvider;
@@ -73,6 +76,44 @@ suite('TranslateHoverProvider Test Suite', () => {
         assert.equal(hover, undefined, 'Hover content was returned unexpectedly.');
     });
 
+    test('Hover works on non-file documents such as the git side of a diff', async () => {
+        await vscode.extensions.getExtension('fatihertugral.open-translate')?.activate();
+
+        // Stands in for `git:` / `gitlens:` / `untitled:` — anything that is not `file:`.
+        const scheme = 'open-translate-test';
+        const registration = vscode.workspace.registerTextDocumentContentProvider(scheme, {
+            provideTextDocumentContent: () => 'Test content',
+        });
+
+        try {
+            const uri = vscode.Uri.parse(`${scheme}:/example.txt`);
+            const editor = await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri));
+            editor.selection = new vscode.Selection(0, 0, 0, 12);
+
+            const hovers = await vscode.commands.executeCommand<vscode.Hover[]>('vscode.executeHoverProvider', uri, new vscode.Position(0, 6));
+            const contents = hovers.flatMap((hover) => hover.contents.map((content) => typeof content === 'string' ? content : content.value));
+
+            assert.ok(contents.includes('**Translated:**\nMock Translate'), `Expected a translation hover, got: ${JSON.stringify(contents)}`);
+        } finally {
+            registration.dispose();
+        }
+    });
+
+    test('Long translations are wrapped so the hover does not span the whole editor', () => {
+        const maxLength = TranslateHoverProvider['MAX_LINE_LENGTH'];
+        const words = Array.from({ length: 60 }, (_, i) => `word${i}`);
+        const lines = TranslateHoverProvider['wrapLines'](words.join(' ')).split('  \n');
+
+        assert.ok(lines.length > 1, 'Long text should be split into several lines.');
+        assert.ok(lines.every((line) => line.length <= maxLength), `Every line should fit in ${maxLength} chars.`);
+        assert.deepStrictEqual(lines.join(' ').split(' '), words, 'Wrapping must not drop or split words.');
+
+        // Languages written without spaces (e.g. Chinese) are cut at the column instead.
+        const unspaced = '翻'.repeat(maxLength * 2 + 5);
+        const unspacedLines = TranslateHoverProvider['wrapLines'](unspaced).split('  \n');
+        assert.deepStrictEqual(unspacedLines.map((line) => line.length), [maxLength, maxLength, 5]);
+    });
+
     test('Char limit validation', () => {
         const longText = 'a'.repeat(TranslateHoverProvider['CHAR_LIMIT'] + 1);
         const isValid = hoverProvider['isValidCharLimit'](longText);
@@ -86,20 +127,15 @@ suite('TranslateHoverProvider Test Suite', () => {
 });
 
 suite('translateText failover Test Suite', () => {
-    let fetchStub: sinon.SinonStub;
+    let httpGetStub: sinon.SinonStub;
     let configStub: sinon.SinonStub;
     let updateSpy: sinon.SinonSpy;
 
     const PRIMARY = 'https://primary.example/translate_a/single';
     const FALLBACK = 'https://fallback.example/translate_a/single';
 
-    function jsonResponse(body: unknown, ok = true, status = 200) {
-        return {
-            ok,
-            status,
-            json: async () => body,
-            text: async () => JSON.stringify(body),
-        } as unknown as Response;
+    function jsonResponse(body: unknown, status = 200): httpClient.HttpResponse {
+        return { status, body: JSON.stringify(body) };
     }
 
     // Google translate_a/single response: [ [ [translated, source, ...], ... ], ... ]
@@ -107,7 +143,7 @@ suite('translateText failover Test Suite', () => {
         return [segments.map((s) => [s, s, null, null, 10]), null, 'en'];
     }
 
-    // fetch is called with the base URL plus a query string, so match by prefix.
+    // httpGet is called with the base URL plus a query string, so match by prefix.
     function startsWith(prefix: string) {
         return sinon.match((value: string) => typeof value === 'string' && value.startsWith(prefix));
     }
@@ -125,7 +161,7 @@ suite('translateText failover Test Suite', () => {
     }
 
     teardown(() => {
-        fetchStub?.restore();
+        httpGetStub?.restore();
         configStub?.restore();
     });
 
@@ -133,11 +169,11 @@ suite('translateText failover Test Suite', () => {
         const api = require('../api');
         stubConfig(PRIMARY, [FALLBACK]);
 
-        fetchStub = sinon.stub(global, 'fetch');
-        // Primary: HTTP 500.
-        fetchStub.withArgs(startsWith(PRIMARY)).resolves(jsonResponse('rate limited', false, 500));
+        httpGetStub = sinon.stub(httpClient, 'httpGet');
+        // Primary: HTTP 429, as Google answers when it rate-limits.
+        httpGetStub.withArgs(startsWith(PRIMARY)).resolves(jsonResponse('rate limited', 429));
         // Fallback: multi-segment Google response.
-        fetchStub.withArgs(startsWith(FALLBACK)).resolves(jsonResponse(googleBody('Merhaba. ', 'Nasılsın?')));
+        httpGetStub.withArgs(startsWith(FALLBACK)).resolves(jsonResponse(googleBody('Merhaba. ', 'Nasılsın?')));
 
         const result = await api.translateText('Hello. How are you?', 'tr');
 
@@ -149,8 +185,8 @@ suite('translateText failover Test Suite', () => {
         const api = require('../api');
         stubConfig(PRIMARY, []);
 
-        fetchStub = sinon.stub(global, 'fetch');
-        fetchStub.resolves(jsonResponse({ unexpected: true }));
+        httpGetStub = sinon.stub(httpClient, 'httpGet');
+        httpGetStub.resolves(jsonResponse({ unexpected: true }));
 
         await assert.rejects(api.translateText('hello', 'tr'), /Translation failed/);
     });
@@ -159,9 +195,47 @@ suite('translateText failover Test Suite', () => {
         const api = require('../api');
         stubConfig(PRIMARY, [FALLBACK]);
 
-        fetchStub = sinon.stub(global, 'fetch');
-        fetchStub.resolves(jsonResponse('error code: 523', false, 523));
+        httpGetStub = sinon.stub(httpClient, 'httpGet');
+        httpGetStub.resolves(jsonResponse('error code: 523', 523));
 
         await assert.rejects(api.translateText('hello', 'tr'), /Set API URL|apiUrl setting/);
+    });
+});
+
+suite('httpGet Test Suite', () => {
+    let server: http2.Http2Server;
+    let baseUrl: string;
+    let handler: (stream: http2.ServerHttp2Stream, headers: http2.IncomingHttpHeaders) => void;
+
+    suiteSetup(async () => {
+        // Cleartext HTTP/2 (h2c) so the test needs no certificate; production URLs are https.
+        server = http2.createServer();
+        server.on('stream', (stream, headers) => handler(stream, headers));
+        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+        baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    });
+
+    suiteTeardown(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+    test('returns status and UTF-8 body, sending path, query and headers', async () => {
+        handler = (stream, headers) => {
+            stream.respond({ ':status': 429 });
+            stream.end(JSON.stringify({ path: headers[':path'], userAgent: headers['user-agent'], text: 'Selam Dünya' }));
+        };
+
+        const response = await httpClient.httpGet(`${baseUrl}/translate_a/single?q=a%20b`, { 'user-agent': 'test-agent' }, 5000);
+
+        assert.strictEqual(response.status, 429);
+        assert.deepStrictEqual(JSON.parse(response.body), { path: '/translate_a/single?q=a%20b', userAgent: 'test-agent', text: 'Selam Dünya' });
+    });
+
+    test('rejects when the server does not answer in time', async () => {
+        handler = () => { /* never respond */ };
+
+        await assert.rejects(httpClient.httpGet(`${baseUrl}/slow`, {}, 100), /timed out/);
+    });
+
+    test('rejects when the host is unreachable', async () => {
+        await assert.rejects(httpClient.httpGet('http://127.0.0.1:1/', {}, 5000));
     });
 });

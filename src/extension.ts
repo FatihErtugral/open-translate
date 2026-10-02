@@ -4,8 +4,9 @@ import TranslateHoverProvider from './hoverProvider';
 
 export function activate(context: vscode.ExtensionContext) {
     const hoverProvider = new TranslateHoverProvider();
+    // Every scheme, not just `file:` — e.g. the original side of a git diff is a `git:` document.
     const hoverProviderRegistration = vscode.languages.registerHoverProvider(
-        { scheme: 'file' },
+        '*',
         hoverProvider
     );
     const setTargetLanguageCommandHandler = getSetTargetLanguageCommandHandler();

@@ -1,5 +1,6 @@
 import { workspace, ConfigurationTarget } from 'vscode';
 import { GoogleTranslateResponse } from './types.js';
+import { httpGet } from './httpClient.js';
 import Enums from './enum.js';
 
 // Google's free translate endpoint does not require an API key but can reject
@@ -50,43 +51,30 @@ function buildCandidateUrls(): string[] {
  * non-empty translation.
  */
 async function requestTranslation(baseUrl: string, text: string, targetLang: string): Promise<string> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const url = `${baseUrl}?client=gtx&sl=auto&tl=${encodeURIComponent(targetLang)}&dt=t&q=${encodeURIComponent(text)}`;
+    const response = await httpGet(url, headers, REQUEST_TIMEOUT_MS);
 
-    try {
-        const url = `${baseUrl}?client=gtx&sl=auto&tl=${encodeURIComponent(targetLang)}&dt=t&q=${encodeURIComponent(text)}`;
-        const response = await fetch(url, {
-            method: 'GET',
-            headers,
-            signal: controller.signal,
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-
-            throw new Error(`HTTP ${response.status}: ${errorText.slice(0, 200)}`);
-        }
-
-        const result = await response.json() as GoogleTranslateResponse;
-        const segments = result?.[0];
-
-        if (!Array.isArray(segments)) {
-            throw new Error('Unexpected response shape');
-        }
-
-        const translatedText = segments
-            .map((segment) => segment?.[0])
-            .filter((part): part is string => typeof part === 'string')
-            .join('');
-
-        if (!translatedText) {
-            throw new Error('Empty translation returned');
-        }
-
-        return translatedText;
-    } finally {
-        clearTimeout(timeout);
+    if (response.status < 200 || response.status >= 300) {
+        throw new Error(`HTTP ${response.status}: ${response.body.slice(0, 200)}`);
     }
+
+    const result = JSON.parse(response.body) as GoogleTranslateResponse;
+    const segments = result?.[0];
+
+    if (!Array.isArray(segments)) {
+        throw new Error('Unexpected response shape');
+    }
+
+    const translatedText = segments
+        .map((segment) => segment?.[0])
+        .filter((part): part is string => typeof part === 'string')
+        .join('');
+
+    if (!translatedText) {
+        throw new Error('Empty translation returned');
+    }
+
+    return translatedText;
 }
 
 /**
