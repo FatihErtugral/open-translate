@@ -6,6 +6,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+## [0.1.2]
+
 - Fix no translation behind TLS-inspecting proxies such as Netskope (every endpoint failed with `HTTP 0`): when the server does not negotiate HTTP/2, requests now use HTTP/1.1 on the same connection.
 
 ## [0.1.1]
