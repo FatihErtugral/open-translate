@@ -6,6 +6,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+- Fix no translation behind TLS-inspecting proxies such as Netskope (every endpoint failed with `HTTP 0`): when the server does not negotiate HTTP/2, requests now use HTTP/1.1 on the same connection.
+
 ## [0.1.1]
 
 - Fix HTTP 429 ("Sorry...") on every endpoint inside VSCode: requests now use Node's HTTP/2 client instead of `fetch`, whose TLS session reuse in VSCode's runtime Google rate-limits.

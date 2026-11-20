@@ -2,7 +2,9 @@ import * as vscode from 'vscode';
 import * as assert from 'assert';
 import * as path from 'path';
 import * as http2 from 'http2';
-import { AddressInfo } from 'net';
+import * as https from 'https';
+import { AddressInfo, Server } from 'net';
+import tls = require('tls'); // sinon cannot stub the read-only bindings of a namespace import
 import * as sinon from 'sinon';
 import TranslateHoverProvider from '../hoverProvider';
 import * as api from '../api';
@@ -237,5 +239,78 @@ suite('httpGet Test Suite', () => {
 
     test('rejects when the host is unreachable', async () => {
         await assert.rejects(httpClient.httpGet('http://127.0.0.1:1/', {}, 5000));
+    });
+});
+
+suite('httpGet over TLS Test Suite', () => {
+    // Self-signed for localhost and 127.0.0.1, valid until 2126.
+    const TEST_KEY = `-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgGHEUXoKwfu6dL/6q
+5K7nCRW0wp8ImFDhjeHsdZExPW6hRANCAARlSfbsJ4d7YOUgPdWaqgPwhDI+rWTV
+sFWTHGZAMU2y3C8ZVYBV0ROgo8KQL6IwYeKd30ztuBCgJvItibXIx92r
+-----END PRIVATE KEY-----`;
+    const TEST_CERT = `-----BEGIN CERTIFICATE-----
+MIIBmjCCAUGgAwIBAgIUJ4XfXm9G0gFmeNxS8KpqGGvjInkwCgYIKoZIzj0EAwIw
+FDESMBAGA1UEAwwJbG9jYWxob3N0MCAXDTI2MTExOTIzNTgwMloYDzIxMjYxMDI2
+MjM1ODAyWjAUMRIwEAYDVQQDDAlsb2NhbGhvc3QwWTATBgcqhkjOPQIBBggqhkjO
+PQMBBwNCAARlSfbsJ4d7YOUgPdWaqgPwhDI+rWTVsFWTHGZAMU2y3C8ZVYBV0ROg
+o8KQL6IwYeKd30ztuBCgJvItibXIx92ro28wbTAdBgNVHQ4EFgQUk/RCe7rTk1fK
+sPHUMIrN+dA3K0gwHwYDVR0jBBgwFoAUk/RCe7rTk1fKsPHUMIrN+dA3K0gwDwYD
+VR0TAQH/BAUwAwEB/zAaBgNVHREEEzARgglsb2NhbGhvc3SHBH8AAAEwCgYIKoZI
+zj0EAwIDRwAwRAIgfA19vV971tGugq1Umv1QhaD9zhWy1+lBHEeUjKYpaKcCIFFc
+47ZNmTgE2KHe4jjy6YoWAFindLw1EBbmiTLb/VsA
+-----END CERTIFICATE-----`;
+    let server: Server;
+    let connectStub: sinon.SinonStub;
+
+    suiteSetup(() => {
+        // Trust the test certificate on the TLS connections httpGet opens.
+        const connect = tls.connect;
+        connectStub = sinon.stub(tls, 'connect').callsFake((...args: unknown[]): tls.TLSSocket =>
+            Reflect.apply(connect, tls, args.map((arg) => (arg && typeof arg === 'object' ? { ...arg, ca: TEST_CERT } : arg))));
+    });
+
+    teardown(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+    suiteTeardown(() => connectStub.restore());
+
+    async function listen(tlsServer: Server): Promise<string> {
+        server = tlsServer;
+        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+        return `https://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    }
+
+    test('uses HTTP/1.1 when the server selects no ALPN protocol, as TLS-inspecting proxies do', async () => {
+        const baseUrl = await listen(https.createServer({ key: TEST_KEY, cert: TEST_CERT, ALPNProtocols: [] }, (request, response) => {
+            response.end(JSON.stringify({
+                alpn: (request.socket as tls.TLSSocket).alpnProtocol,
+                httpVersion: request.httpVersion,
+                path: request.url,
+                host: request.headers.host,
+                userAgent: request.headers['user-agent'],
+            }));
+        }));
+
+        const response = await httpClient.httpGet(`${baseUrl}/translate_a/single?q=a%20b`, { 'user-agent': 'test-agent' }, 5000);
+
+        assert.strictEqual(response.status, 200);
+        assert.deepStrictEqual(JSON.parse(response.body), {
+            alpn: false,
+            httpVersion: '1.1',
+            path: '/translate_a/single?q=a%20b',
+            host: new URL(baseUrl).host,
+            userAgent: 'test-agent',
+        });
+    });
+
+    test('uses HTTP/2 when the server selects h2', async () => {
+        const baseUrl = await listen(http2.createSecureServer({ key: TEST_KEY, cert: TEST_CERT, allowHTTP1: true }, (request, response) => {
+            response.end(request.httpVersion);
+        }));
+
+        const response = await httpClient.httpGet(`${baseUrl}/`, {}, 5000);
+
+        assert.strictEqual(response.status, 200);
+        assert.strictEqual(response.body, '2.0');
     });
 });
