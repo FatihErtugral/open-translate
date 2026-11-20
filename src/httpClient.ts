@@ -8,6 +8,13 @@ export interface HttpResponse {
     body: string;
 }
 
+// Node 22.15+; on older VSCode runtimes `ca` stays unset and Node's default CAs apply.
+const tlsCaStores = tls as typeof tls & { getCACertificates?: (type: 'default' | 'system') => string[] };
+
+function trustedCertificates(): string[] | undefined {
+    return tlsCaStores.getCACertificates && [...tlsCaStores.getCACertificates('default'), ...tlsCaStores.getCACertificates('system')];
+}
+
 /**
  * GET `url` on a fresh connection and resolve with the status and UTF-8 body
  * (any status; callers decide what counts as success).
@@ -23,6 +30,12 @@ export interface HttpResponse {
  * proxies such as Netskope select no protocol and reset an HTTP/2 request. The
  * HTTP/1.1 request is a `new http.ClientRequest` because VSCode patches
  * `http.request`, and the patch replaces our socket with its own agent.
+ *
+ * The socket trusts the operating system's CA store besides Node's default CAs
+ * (bundled roots and `NODE_EXTRA_CA_CERTS`). VSCode adds the system CAs to
+ * `https` and `fetch`, but by default not to `tls.connect`, and the CA of a TLS-inspecting
+ * proxy is often only in the system store: a VSCode started from the Dock does
+ * not get `NODE_EXTRA_CA_CERTS` when it cannot resolve the shell environment.
  */
 export function httpGet(url: string, headers: Record<string, string>, timeoutMs: number): Promise<HttpResponse> {
     const { protocol, host, hostname, port, origin, pathname, search } = new URL(url);
@@ -32,7 +45,7 @@ export function httpGet(url: string, headers: Record<string, string>, timeoutMs:
     return new Promise((resolve, reject) => {
         // Plain `http:` URLs speak cleartext HTTP/2 (h2c), which has no ALPN.
         const socket = protocol === 'https:'
-            ? tls.connect({ host: address, port: Number(port || 443), servername: net.isIP(address) ? undefined : address, ALPNProtocols: ['h2', 'http/1.1'] })
+            ? tls.connect({ host: address, port: Number(port || 443), servername: net.isIP(address) ? undefined : address, ALPNProtocols: ['h2', 'http/1.1'], ca: trustedCertificates() })
             : net.connect({ host: address, port: Number(port || 80) });
         const chunks: Buffer[] = [];
         let status = 0;

@@ -242,14 +242,13 @@ suite('httpGet Test Suite', () => {
     });
 });
 
-suite('httpGet over TLS Test Suite', () => {
-    // Self-signed for localhost and 127.0.0.1, valid until 2126.
-    const TEST_KEY = `-----BEGIN PRIVATE KEY-----
+// Self-signed for localhost and 127.0.0.1, valid until 2126.
+const TEST_KEY = `-----BEGIN PRIVATE KEY-----
 MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgGHEUXoKwfu6dL/6q
 5K7nCRW0wp8ImFDhjeHsdZExPW6hRANCAARlSfbsJ4d7YOUgPdWaqgPwhDI+rWTV
 sFWTHGZAMU2y3C8ZVYBV0ROgo8KQL6IwYeKd30ztuBCgJvItibXIx92r
 -----END PRIVATE KEY-----`;
-    const TEST_CERT = `-----BEGIN CERTIFICATE-----
+const TEST_CERT = `-----BEGIN CERTIFICATE-----
 MIIBmjCCAUGgAwIBAgIUJ4XfXm9G0gFmeNxS8KpqGGvjInkwCgYIKoZIzj0EAwIw
 FDESMBAGA1UEAwwJbG9jYWxob3N0MCAXDTI2MTExOTIzNTgwMloYDzIxMjYxMDI2
 MjM1ODAyWjAUMRIwEAYDVQQDDAlsb2NhbGhvc3QwWTATBgcqhkjOPQIBBggqhkjO
@@ -260,6 +259,8 @@ VR0TAQH/BAUwAwEB/zAaBgNVHREEEzARgglsb2NhbGhvc3SHBH8AAAEwCgYIKoZI
 zj0EAwIDRwAwRAIgfA19vV971tGugq1Umv1QhaD9zhWy1+lBHEeUjKYpaKcCIFFc
 47ZNmTgE2KHe4jjy6YoWAFindLw1EBbmiTLb/VsA
 -----END CERTIFICATE-----`;
+
+suite('httpGet over TLS Test Suite', () => {
     let server: Server;
     let connectStub: sinon.SinonStub;
 
@@ -312,5 +313,30 @@ zj0EAwIDRwAwRAIgfA19vV971tGugq1Umv1QhaD9zhWy1+lBHEeUjKYpaKcCIFFc
 
         assert.strictEqual(response.status, 200);
         assert.strictEqual(response.body, '2.0');
+    });
+});
+
+suite('httpGet trust store Test Suite', () => {
+    // `tls.getCACertificates` is Node 22.15+, newer than the @types/node of this repository.
+    const tlsCaStores = tls as typeof tls & { getCACertificates(type: string): string[] };
+    let server: Server;
+    let caStub: sinon.SinonStub;
+
+    teardown(() => {
+        caStub.restore();
+        return new Promise<void>((resolve) => server.close(() => resolve()));
+    });
+
+    test('trusts a CA that only the operating system store holds, as when NODE_EXTRA_CA_CERTS is not set', async () => {
+        const getCACertificates = tlsCaStores.getCACertificates;
+        caStub = sinon.stub(tlsCaStores, 'getCACertificates').callsFake((type: string) =>
+            (type === 'system' ? [TEST_CERT] : getCACertificates(type)));
+        server = https.createServer({ key: TEST_KEY, cert: TEST_CERT }, (request, response) => response.end('trusted'));
+        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+
+        const response = await httpClient.httpGet(`https://127.0.0.1:${(server.address() as AddressInfo).port}/`, {}, 5000);
+
+        assert.strictEqual(response.status, 200);
+        assert.strictEqual(response.body, 'trusted');
     });
 });
