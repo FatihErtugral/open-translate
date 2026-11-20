@@ -6,6 +6,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+## [0.1.3]
+
 - Fix "self signed certificate in certificate chain" on every endpoint behind TLS-inspecting proxies such as Netskope, when VSCode does not get `NODE_EXTRA_CA_CERTS` (for example, started from the Dock when it cannot resolve the shell environment): requests now also trust the operating system's certificate store (VSCode with Node 22.15 or later).
 
 ## [0.1.2]
